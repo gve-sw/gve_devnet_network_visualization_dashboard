@@ -1,0 +1,12 @@
+devices:
+  [ device-name ]:
+    os: [ ios | iosxe | nxos ]
+    type: [ switch | router ]
+    connections:
+      defaults:
+        class: unicon.Unicon
+      cli:
+        protocol: ssh
+        ip: [ x.x.x.x ]
+        username: [ xxxx ]
+        password: [ xxxx ]
