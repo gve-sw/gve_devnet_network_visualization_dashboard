@@ -116,18 +116,42 @@ def parse_nx_memory_process(memory_processes, device):
 
 def parse_ospf_neighbor(ospf_neighbors, device):
     ospf_neighbor_list = []
-    for interface in ospf_neighbors:
-        for neighbor in ospf_neighbors[interface]["neighbors"]:
-            ospf_neighbor_info = {}
-            ospf_neighbor_info["device"] = device["name"]
-            ospf_neighbor_info["ip"] = device["ip"]
-            ospf_neighbor_info["interface"] = interface
-            ospf_neighbor_info["neighbor"] = neighbor
-            ospf_neighbor_info["priority"] = ospf_neighbors[interface]["neighbors"][neighbor]["priority"]
-            ospf_neighbor_info["state"] = ospf_neighbors[interface]["neighbors"][neighbor]["state"]
-            ospf_neighbor_info["dead_time"] = ospf_neighbors[interface]["neighbors"][neighbor]["dead_time"]
-            ospf_neighbor_info["address"] = ospf_neighbors[interface]["neighbors"][neighbor]["address"]
-            ospf_neighbor_list.append(ospf_neighbor_info)
+    for vrf in ospf_neighbors:
+        for process in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"]:
+            for area in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["area"]:
+                for interface in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["area"][area]["interfaces"]:
+                    for neighbor in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["area"][area]["interfaces"][interface]["neighbors"]:
+                        ospf_neighbor_info = {}
+                        ospf_neighbor_info["device"] = device["name"]
+                        ospf_neighbor_info["ip"] = device["ip"]
+                        ospf_neighbor_info["vrf"] = vrf
+                        ospf_neighbor_info["process_id"] = process
+                        ospf_neighbor_info["area"] = area
+                        ospf_neighbor_info["interface"] = interface
+                        ospf_neighbor_info["neighbor"] = neighbor
+                        ospf_neighbor_info["router_id"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["neighbor_router_id"]
+                        ospf_neighbor_info["address"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["address"]
+                        if "state" in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor].keys():
+                            ospf_neighbor_info["state"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["state"]
+                        else:
+                            ospf_neighbor_info["state"] = "n/a"
+                        if "priority" in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor].keys():
+                            ospf_neighbor_info["priority"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["priority"]
+                        else:
+                            ospf_neighbor_info["priority"] = "n/a"
+                        if "dr_ip_addr" in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor].keys():
+                            ospf_neighbor_info["dr_ip"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["area"][area]["interfaces"][interface]["neighbors"][neighbor]["dr_ip_addr"]
+                        else:
+                            ospf_neighbor_info["dr_ip"] = "n/a"
+                        if "bdr_ip_addr" in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["area"][area]["interfaces"][interface]["neighbors"][neighbor].keys():
+                            ospf_neighbor_info["bdr_ip"] = ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["bdr_ip_addr"]
+                        else:
+                            ospf_neighbor_info["bdr_ip"] = "n/a"
+                        if "dead_time" in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"][process]["areas"][area]["interfaces"][interface]["neighbors"][neighbor].keys():
+                            ospf_neighbor_info["dead_time"] = ospf_neighbors[interface]["neighbors"][neighbor]["dead_time"]
+                        else:
+                            ospf_neighbor_info["dead_time"] = "n/a"
+                        ospf_neighbor_list.append(ospf_neighbor_info)
 
     return ospf_neighbor_list
 
@@ -242,7 +266,7 @@ def run_ios_commands(ios_devices):
         else:
             memory_processes = {}
         if show_ospf_neighbor:
-            ospf_neighbors = show_ospf_neighbor["interfaces"]
+            ospf_neighbors = show_ospf_neighbor["vrf"]
         else:
             ospf_neighbors = {}
 
