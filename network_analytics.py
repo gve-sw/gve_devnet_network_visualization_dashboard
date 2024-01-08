@@ -17,9 +17,17 @@ import os
 import sys
 from genie import testbed
 import pandas as pd
-from pprint import pprint
+
 
 def parse_interfaces(interfaces, device):
+    """
+    Create a list of dictionaries with the information from each interface.
+    This information includes the device name, ip address, interface name, 
+    whether the interface is enabled, the operating status, admin state, 
+    auto negotiate status, bandwidth, mtu, port mode, output rate, and input 
+    rate.
+    :return: list of dictionaries 
+    """
     interface_list = []
     for interface in interfaces:
         interface_info = {}
@@ -62,6 +70,13 @@ def parse_interfaces(interfaces, device):
     return interface_list
 
 def parse_cpu_process(cpu_processes, device):
+    """
+    Create a list of dictionaries with the information from the cpu 
+    processes. This information includes the device name, ip address, 
+    the process id, process name, whether the process is invoked, the 
+    runtime, and usecs.
+    :return: list of dictionaries
+    """
     cpu_process_list = []
     for key in cpu_processes:
             cpu_process_info = {}
@@ -81,6 +96,13 @@ def parse_cpu_process(cpu_processes, device):
     return cpu_process_list
 
 def parse_memory_process(memory_processes, device):
+    """
+    Create a list of dictionaries with the information from the memory 
+    processes of the IOS devices. This information includes the device name, 
+    ip address, process id, process name, tty, the amount of memory allocated, 
+    the amount of memory freed, how much is holding, the getbufs, and retbufs.
+    :return: list of dictionaries
+    """
     memory_process_list = []
     for key in memory_processes:
         for index in memory_processes[key]["index"]:
@@ -100,6 +122,13 @@ def parse_memory_process(memory_processes, device):
     return memory_process_list
 
 def parse_nx_memory_process(memory_processes, device):
+    """
+    Create as list of dictionaries with the information from the memory 
+    processes of the Nexus devices. This information includes the device 
+    name, ip address, process id, process, the amount of memory allocated, 
+    and the amount of memory used.
+    :return: list of dictionaries
+    """
     memory_process_list = []
     for key in memory_processes:
             for index in memory_processes[key]["index"]:
@@ -115,6 +144,14 @@ def parse_nx_memory_process(memory_processes, device):
     return memory_process_list
 
 def parse_ospf_neighbor(ospf_neighbors, device):
+    """
+    Create a list of dictionaries with the OSPF neighbor information of 
+    each interface. This information includes the device name, ip address, 
+    vrf, process id, area, interface, neighbor, router id, neighbor ip 
+    address, neighbor state, neighbor priority, designated router ip 
+    address, backup designated router ip address, and dead time.
+    :return: list of dictionaries
+    """
     ospf_neighbor_list = []
     for vrf in ospf_neighbors:
         for process in ospf_neighbors[vrf]["address_family"]["ipv4"]["instance"]:
@@ -156,6 +193,14 @@ def parse_ospf_neighbor(ospf_neighbors, device):
     return ospf_neighbor_list
 
 def run_nxos_commands(nxos_devices):
+    """
+    Connect to Nexus devices and run the commands show interface, 
+    show ip ospf neighbors detail, show processes memory, and show 
+    processes cpu. Add the results of running the commands to a 
+    dictionary.
+    :return: dictionary containing lists with the parsed results of 
+    running the commands on each device
+    """
     nxos_info = {
         "interfaces": [],
         "cpu_processes": [],
@@ -219,6 +264,14 @@ def run_nxos_commands(nxos_devices):
     return nxos_info
 
 def run_ios_commands(ios_devices):
+    """
+    Connect to IOS devices and run the commands show interfaces, 
+    show ip ospf neighbor, show processes memory, and show 
+    processes cpu. Add the results of running the commands to a 
+    dictionary.
+    :return: dictionary containing lists with the parsed results of 
+    running the commands on each device
+    """
     ios_info = {
         "interfaces": [],
         "cpu_processes": [],
@@ -282,12 +335,14 @@ def run_ios_commands(ios_devices):
     return ios_info
 
 def main(argv):
+    # retrieve the devices we will connect to from the network testbed YAML file
     testbed_list = testbed.load(f"./network_testbed.yml")
     devices = testbed_list.devices
 
     nxos_devices = {}
     ios_devices = {}
 
+    # separate the IOS devices from the Nexus devices
     for device in devices:
         node = devices[device]
         if node.os == "nxos":
@@ -295,7 +350,9 @@ def main(argv):
         elif node.os == "ios" or node.os == "iosxe":
             ios_devices[device] = node
 
+    # run and parse the results of the commands on the devices
     if nxos_devices != {}:
+        # the Nexus commands are slightly different from the IOS devices
         nxos_info = run_nxos_commands(nxos_devices)
     else:
         nxos_info = {}
@@ -305,25 +362,53 @@ def main(argv):
     else:
         ios_info = {}
 
+    # create an Excel file with sheets for each of the IOS and Nexus commands
+    # highlight the cells of the interfaces sheets that represent shutdown interfaces in red
     with pd.ExcelWriter("network_analytics.xlsx") as writer:
+        workbook = writer.book
         if nxos_info:
             nxos_interface_df = pd.DataFrame.from_dict(nxos_info["interfaces"])
             nxos_cpu_df = pd.DataFrame.from_dict(nxos_info["cpu_processes"])
             nxos_memory_df = pd.DataFrame.from_dict(nxos_info["memory_processes"])
             nxos_ospf_df = pd.DataFrame.from_dict(nxos_info["ospf_neighbors"])
-            nxos_interface_df.to_excel(writer, sheet_name="Nexus Interfaces")
+
+            nxos_interface_df.to_excel(writer, sheet_name="NXOS Interfaces")
             nxos_cpu_df.to_excel(writer, sheet_name="NXOS CPU Processes")
             nxos_memory_df.to_excel(writer, sheet_name="NXOS Memory Processes")
             nxos_ospf_df.to_excel(writer, sheet_name="NXOS OSPF Neighbors")
+
+            nxos_interfaces_sheet = workbook.get_worksheet_by_name("NXOS Interfaces")
+            error_format = workbook.add_format({"bg_color": "red"})
+            interface_len = len(nxos_info["interfaces"])
+            cell_range = "E1:E" + str(interface_len)
+            nxos_interfaces_sheet.conditional_format(cell_range,
+                                                     {"type": "text",
+                                                      "criteria": "containing",
+                                                      "value": "FALSE",
+                                                      "format": error_format})
+
+
+
         if ios_info:
             ios_interface_df = pd.DataFrame.from_dict(ios_info["interfaces"])
             ios_cpu_df = pd.DataFrame.from_dict(ios_info["cpu_processes"])
             ios_memory_df = pd.DataFrame.from_dict(ios_info["memory_processes"])
             ios_ospf_df = pd.DataFrame.from_dict(ios_info["ospf_neighbors"])
+
             ios_interface_df.to_excel(writer, sheet_name="IOS Interfaces")
             ios_cpu_df.to_excel(writer, sheet_name="IOS CPU Processes")
             ios_memory_df.to_excel(writer, sheet_name="IOS Memory Processes")
             ios_ospf_df.to_excel(writer, sheet_name="IOS OSPF Neighbors")
+
+            ios_interfaces_sheet = workbook.get_worksheet_by_name("IOS Interfaces")
+            error_format = workbook.add_format({"bg_color": "red"})
+            interface_len = len(ios_info["interfaces"])
+            cell_range = "E1:E" + str(interface_len)
+            ios_interfaces_sheet.conditional_format(cell_range,
+                                                     {"type": "text",
+                                                      "criteria": "containing",
+                                                      "value": "FALSE",
+                                                      "format": error_format})
 
 
 
